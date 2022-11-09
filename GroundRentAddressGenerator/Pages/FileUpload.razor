@@ -1,0 +1,143 @@
+﻿@page "/fileUpload"
+@using System.IO
+@using CsvHelper
+@using DataLibrary.DbAccess
+@using DataLibrary.DbServices
+@using DataLibrary.Models
+@using DataLibrary.Services
+@using Microsoft.AspNetCore.Http
+@using Adobe.PDFServicesSDK.auth;
+@using Adobe.PDFServicesSDK.io;
+@using Adobe.PDFServicesSDK.options.extractpdf;
+@using Adobe.PDFServicesSDK.pdfops;
+@using ExecutionContext = Adobe.PDFServicesSDK.ExecutionContext;
+@using System.Globalization
+@inject IDataContext dataContext
+@inject IAddressDataServiceFactory addressDataServiceFactory
+
+<div class="row mb-3 mt-3">
+    <div class="container">
+        <div>
+            <InputFile OnChange="OnInputFileChange" multiple></InputFile>
+            <button class="btn btn-primary" type="submit" @onclick="Upload">Upload</button>
+            <button class="btn btn-warning" type="submit" @onclick="ExtractPdf">Extract</button>
+        </div>
+        @if(selectedFiles is not null)
+        {
+            <div class="row mb-3 mt-3">
+                @foreach (var file in files)
+                {
+                    <div class="table-striped">
+                        <p>@file.File.Name</p>
+                        <p>@file.File.ContentType</p>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<IBrowserFile>? selectedFiles;
+    private List<FileModel> files = new();
+    private string Message = "No file(s) selected";
+    private long maxAllowedBufferSize = 1024 * 1024 * 4;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        if(files.Count > 0)
+        { 
+            files = new(); 
+        }
+        selectedFiles = e.GetMultipleFiles();
+        foreach(var selectedFile in selectedFiles)
+        {
+            FileModel file = new();
+            file.File = selectedFile;
+            files.Add(file);
+        }
+        Message = $"{files.Count} file(s) selected";
+        this.StateHasChanged();
+    }
+
+    private async void Upload()
+    {
+        foreach (var file in files)
+        {
+            Stream stream = file.File.OpenReadStream(maxAllowedBufferSize);
+            file.UploadPath = Directory.GetCurrentDirectory() + @"\wwwroot\data\" + "uploadId_" + Guid.NewGuid().ToString() + "_" + file.File.Name;
+            FileStream fileStream = File.Create(file.UploadPath);
+            await stream.CopyToAsync(fileStream);
+            stream.Close();
+        }
+        Message = $"{files.Count} file(s) uploaded on server";
+        this.StateHasChanged();
+    }
+    private void ExtractPdf()
+    {
+        Credentials credentials = Credentials.ServiceAccountCredentialsBuilder()
+            .FromFile(Directory.GetCurrentDirectory() + @"\wwwroot\" + "pdfservices-api-credentials.json")
+            .Build();
+
+        ExecutionContext executionContext = ExecutionContext.Create(credentials);
+        ExtractPDFOperation extractPdfOperation = ExtractPDFOperation.CreateNew();
+
+        foreach(var file in files)
+        {
+            FileRef sourceFileRef = FileRef.CreateFromLocalFile(file.UploadPath);
+            extractPdfOperation.SetInputFile(sourceFileRef);
+
+            ExtractPDFOptions extractPdfOptions = ExtractPDFOptions.ExtractPDFOptionsBuilder()
+                .AddCharsInfo(false)
+                .AddGetStylingInfo(false)
+                .AddElementsToExtract(new List<ExtractElementType>(new[] { ExtractElementType.TABLES }))
+                .AddTableStructureFormat(TableStructureType.CSV)
+                .Build();
+
+            extractPdfOperation.SetOptions(extractPdfOptions);
+            FileRef result = extractPdfOperation.Execute(executionContext);
+
+            file.ExtractPath = file.UploadPath.Replace("uploadId_", "extractId_") + ".zip";
+            result.SaveAs(file.ExtractPath);
+        }
+    }
+    //private void UnzipFile()
+    //{
+    //    string jsonPath =
+    //            @"C:\Users\Jason\source\repos\GroundRentAddressGeneratorApp\GroundRentAddressGenerator\wwwroot\Data\";
+
+    //    ZipFile.ExtractToDirectory(request.ExtractFromFilePath, request.ExtractToFilePath);
+    //    if (request.ExtractFromFilePath != null)
+    //    {
+    //        File.Delete(request.ExtractFromFilePath);
+    //    }
+    //    if (request.JsonFilePath != null)
+    //    {
+    //        File.Delete(request.JsonFilePath);
+    //    }
+    //}
+    //private async void CsvParser()
+    //{
+    //    using (var streamReader = new StreamReader(request.FilePath))
+    //    {
+    //        using (var csvReader = new CsvReader(streamReader, CultureInfo.InvariantCulture))
+    //        {
+    //            csvReader.Context.RegisterClassMap<AddressClassMap>();
+    //            while (csvReader.Read())
+    //            {
+    //                using (var uow = dataContext.CreateUnitOfWork())
+    //                {
+    //                    var record = csvReader.GetRecord<AddressModel>();
+    //                    var addressDataService = addressDataServiceFactory.CreateAddressDataService(uow);
+    //                    await addressDataService.CreateAddress(record);
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
+}
