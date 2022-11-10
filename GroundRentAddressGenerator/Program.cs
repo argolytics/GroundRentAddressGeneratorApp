@@ -17,6 +17,7 @@ public class Program
         //builder.Services.AddMediatR(typeof(MediatREntryPoint).Assembly);
         builder.Services.AddScoped<IDataContext>(s => new DataContext(configuration.GetConnectionString("Default")));
         builder.Services.AddScoped<IAddressDataServiceFactory, AddressDataServiceFactory>();
+        builder.Services.AddHttpContextAccessor();
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.
@@ -35,6 +36,7 @@ public class Program
 
         app.MapBlazorHub();
         app.MapFallbackToPage("/_Host");
+        app.MapRazorPages(); 
 
         app.Run();
     }

@@ -21,6 +21,7 @@
             <InputFile OnChange="OnInputFileChange" multiple></InputFile>
             <button class="btn btn-primary" type="submit" @onclick="Upload">Upload</button>
             <button class="btn btn-warning" type="submit" @onclick="ExtractPdf">Extract</button>
+            <button class="btn btn-warning" type="submit" @onclick="ExtractPdfTest">Extract Test (Same code as Razor)</button>
         </div>
         @if(selectedFiles is not null)
         {
@@ -34,6 +35,9 @@
                 }
             </div>
         }
+        <div>
+            @Message
+        </div>
     </div>
 </div>
 
@@ -69,27 +73,37 @@
     {
         foreach (var file in files)
         {
-            Stream stream = file.File.OpenReadStream(maxAllowedBufferSize);
-            file.UploadPath = Directory.GetCurrentDirectory() + @"\wwwroot\data\" + "uploadId_" + Guid.NewGuid().ToString() + "_" + file.File.Name;
-            FileStream fileStream = File.Create(file.UploadPath);
-            await stream.CopyToAsync(fileStream);
+            using Stream stream = file.File.OpenReadStream(maxAllowedBufferSize);
+            file.UploadPath = Directory.GetCurrentDirectory() + @"\wwwroot\data\" + "uploadId_" + file.File.Name;
+            using FileStream fileStream = File.Create(file.UploadPath);
+            var bytesRead = 0;
+            var totalRead = 0;
+            var buffer = new byte[1024 * 10];
+            while ((bytesRead = await stream.ReadAsync(buffer)) != 0)
+            {
+                totalRead += bytesRead;
+                await fileStream.WriteAsync(buffer, 0, bytesRead);
+            }
+            fileStream.Close();
+            fileStream.Dispose();
+            //await stream.CopyToAsync(fileStream);
             stream.Close();
         }
         Message = $"{files.Count} file(s) uploaded on server";
         this.StateHasChanged();
     }
-    private void ExtractPdf()
-    {
-        Credentials credentials = Credentials.ServiceAccountCredentialsBuilder()
-            .FromFile(Directory.GetCurrentDirectory() + @"\wwwroot\" + "pdfservices-api-credentials.json")
-            .Build();
-
-        ExecutionContext executionContext = ExecutionContext.Create(credentials);
-        ExtractPDFOperation extractPdfOperation = ExtractPDFOperation.CreateNew();
-
-        foreach(var file in files)
+    private void ExtractPdfTest(){
+        try
         {
-            FileRef sourceFileRef = FileRef.CreateFromLocalFile(file.UploadPath);
+            Credentials credentials = Credentials.ServiceAccountCredentialsBuilder()
+                .FromFile(Directory.GetCurrentDirectory() + @"\wwwroot\" + "pdfservices-api-credentials.json")
+                .Build();
+
+            ExecutionContext executionContext = ExecutionContext.Create(credentials);
+            ExtractPDFOperation extractPdfOperation = ExtractPDFOperation.CreateNew();
+
+            var path = @"wwwroot\Data\extractPDFInput.pdf";
+            FileRef sourceFileRef = FileRef.CreateFromLocalFile(path);
             extractPdfOperation.SetInputFile(sourceFileRef);
 
             ExtractPDFOptions extractPdfOptions = ExtractPDFOptions.ExtractPDFOptionsBuilder()
@@ -100,10 +114,56 @@
                 .Build();
 
             extractPdfOperation.SetOptions(extractPdfOptions);
+
             FileRef result = extractPdfOperation.Execute(executionContext);
 
-            file.ExtractPath = file.UploadPath.Replace("uploadId_", "extractId_") + ".zip";
-            result.SaveAs(file.ExtractPath);
+            var extPath = path.Replace("extract", "resultblaze") + Guid.NewGuid().ToString() + ".zip";
+            result.SaveAs(extPath);
+            Message = $"Output path = {extPath}";
+            this.StateHasChanged();
+        }
+        catch(Exception e)
+        {
+            Message = e.ToString();
+            this.StateHasChanged();
+        }
+
+    }
+    private void ExtractPdf()
+    {
+        try
+        {
+            Credentials credentials = Credentials.ServiceAccountCredentialsBuilder()
+                .FromFile(Directory.GetCurrentDirectory() + @"\wwwroot\" + "pdfservices-api-credentials.json")
+                .Build();
+
+            ExecutionContext executionContext = ExecutionContext.Create(credentials);
+            ExtractPDFOperation extractPdfOperation = ExtractPDFOperation.CreateNew();
+
+            foreach(var file in files)
+            {
+                    FileRef sourceFileRef = FileRef.CreateFromLocalFile(file.UploadPath);
+                    extractPdfOperation.SetInputFile(sourceFileRef);
+
+                    ExtractPDFOptions extractPdfOptions = ExtractPDFOptions.ExtractPDFOptionsBuilder()
+                        .AddCharsInfo(false)
+                        .AddGetStylingInfo(false)
+                        .AddElementsToExtract(new List<ExtractElementType>(new[] { ExtractElementType.TABLES }))
+                        .AddTableStructureFormat(TableStructureType.CSV)
+                        .Build();
+
+                    extractPdfOperation.SetOptions(extractPdfOptions);
+                    FileRef result = extractPdfOperation.Execute(executionContext);
+
+                    file.ExtractPath = file.UploadPath.Replace("uploadId_", "extractId_") + ".zip";
+                    result.SaveAs(file.ExtractPath);
+
+            }
+        }
+        catch(Exception e)
+        {
+            Message = e.ToString();
+            this.StateHasChanged();
         }
     }
     //private void UnzipFile()
