@@ -7,21 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Remove="wwwroot\pdfservices-api-credentials.json" />
-    <Content Remove="wwwroot\private.key" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\DataLibrary\DataLibrary.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="wwwroot\data\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="wwwroot\pdfservices-api-credentials.json" />
-    <None Include="wwwroot\private.key" />
   </ItemGroup>
 
 </Project>

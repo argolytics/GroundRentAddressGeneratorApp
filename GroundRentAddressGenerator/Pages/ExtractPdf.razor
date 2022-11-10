@@ -1,17 +1,15 @@
-﻿@page "/fileUpload"
+﻿@page "/extractPdf"
 @using System.IO
 @using CsvHelper
 @using DataLibrary.DbAccess
 @using DataLibrary.DbServices
+@using DataLibrary.HttpClients
 @using DataLibrary.Models
 @using DataLibrary.Services
 @using Microsoft.AspNetCore.Http
-@using Adobe.PDFServicesSDK.auth;
-@using Adobe.PDFServicesSDK.io;
-@using Adobe.PDFServicesSDK.options.extractpdf;
-@using Adobe.PDFServicesSDK.pdfops;
-@using ExecutionContext = Adobe.PDFServicesSDK.ExecutionContext;
 @using System.Globalization
+@inject GetUploadUri getUploadUri
+@inject UploadPdf uploadPdf
 @inject IDataContext dataContext
 @inject IAddressDataServiceFactory addressDataServiceFactory
 
@@ -19,8 +17,9 @@
     <div class="container">
         <div>
             <InputFile OnChange="OnInputFileChange" multiple></InputFile>
-            <button class="btn btn-primary" type="submit" @onclick="Upload">Upload</button>
-            <button class="btn btn-warning" type="submit" @onclick="ExtractPdf">Extract</button>
+            <button class="btn btn-primary" type="submit" @onclick="UploadToLocal">UploadToLocal</button>
+            <button class="btn btn-secondary" type="submit" @onclick="UploadToAdobe">UploadToAdobe</button>
+            <button class="btn btn-warning" type="submit" @onclick="ExtractPdf">ExtractPdf</button>
         </div>
         @if(selectedFiles is not null)
         {
@@ -43,11 +42,6 @@
     private string Message = "No file(s) selected";
     private long maxAllowedBufferSize = 1024 * 1024 * 4;
 
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-    }
-
     private async Task OnInputFileChange(InputFileChangeEventArgs e)
     {
         if(files.Count > 0)
@@ -64,8 +58,7 @@
         Message = $"{files.Count} file(s) selected";
         this.StateHasChanged();
     }
-
-    private async void Upload()
+    private async void UploadToLocal()
     {
         foreach (var file in files)
         {
@@ -73,39 +66,32 @@
             file.UploadPath = Directory.GetCurrentDirectory() + @"\wwwroot\data\" + "uploadId_" + Guid.NewGuid().ToString() + "_" + file.File.Name;
             FileStream fileStream = File.Create(file.UploadPath);
             await stream.CopyToAsync(fileStream);
+            fileStream.Close();
+            fileStream.Dispose();
             stream.Close();
+            stream.Dispose();
         }
         Message = $"{files.Count} file(s) uploaded on server";
         this.StateHasChanged();
     }
-    private void ExtractPdf()
+    private async void UploadToAdobe()
     {
-        Credentials credentials = Credentials.ServiceAccountCredentialsBuilder()
-            .FromFile(Directory.GetCurrentDirectory() + @"\wwwroot\" + "pdfservices-api-credentials.json")
-            .Build();
-
-        ExecutionContext executionContext = ExecutionContext.Create(credentials);
-        ExtractPDFOperation extractPdfOperation = ExtractPDFOperation.CreateNew();
-
         foreach(var file in files)
         {
-            FileRef sourceFileRef = FileRef.CreateFromLocalFile(file.UploadPath);
-            extractPdfOperation.SetInputFile(sourceFileRef);
-
-            ExtractPDFOptions extractPdfOptions = ExtractPDFOptions.ExtractPDFOptionsBuilder()
-                .AddCharsInfo(false)
-                .AddGetStylingInfo(false)
-                .AddElementsToExtract(new List<ExtractElementType>(new[] { ExtractElementType.TABLES }))
-                .AddTableStructureFormat(TableStructureType.CSV)
-                .Build();
-
-            extractPdfOperation.SetOptions(extractPdfOptions);
-            FileRef result = extractPdfOperation.Execute(executionContext);
-
-            file.ExtractPath = file.UploadPath.Replace("uploadId_", "extractId_") + ".zip";
-            result.SaveAs(file.ExtractPath);
+            var response = await getUploadUri.Upload();
+            var fileContent = response.Content.ReadAsStringAsync();
+            file.UploadUri = ""; // how to get from fileContent?
+            file.AssetId = ""; // how to get from fileContent?
+            await uploadPdf.Upload(file.UploadUri, file.UploadPath);
         }
     }
+
+    private async void ExtractPdf()
+    {
+        // to do
+        // await extractPdf.Extract(file.AssetId);
+    }
+
     //private void UnzipFile()
     //{
     //    string jsonPath =
@@ -121,7 +107,7 @@
     //        File.Delete(request.JsonFilePath);
     //    }
     //}
-    //private async void CsvParser()
+    //private async void ParseCsv()
     //{
     //    using (var streamReader = new StreamReader(request.FilePath))
     //    {
