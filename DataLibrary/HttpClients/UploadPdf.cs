@@ -13,7 +13,6 @@ public class UploadPdf
         FileStream fileStream = File.Create(uploadPath);
         var size = fileStream.Length;
         HttpContent content = new StreamContent(fileStream);
-        _httpClient.DefaultRequestHeaders.Add("Content-Length", size.ToString());
 
         return await _httpClient.PutAsync(uploadUri, content);
     }

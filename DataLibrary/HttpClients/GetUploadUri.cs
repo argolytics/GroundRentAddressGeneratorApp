@@ -1,5 +1,5 @@
 ﻿using DataLibrary.Models;
-using System.Text.Json;
+using System.Net.Http.Json;
 
 namespace DataLibrary.HttpClients;
 public class GetUploadUri
@@ -17,9 +17,6 @@ public class GetUploadUri
         {
             mediaType = "application/json"
         };
-        var jsonBody = JsonSerializer.Serialize(mediaType);
-        HttpContent content = new StringContent(jsonBody);
-
-        return await _httpClient.PostAsync("https://pdf-services.adobe.io/assets", content);
+        return await _httpClient.PostAsJsonAsync("https://pdf-services.adobe.io/assets", mediaType);
     }
 }

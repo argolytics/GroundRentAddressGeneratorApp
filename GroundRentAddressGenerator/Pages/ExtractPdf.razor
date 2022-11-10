@@ -8,6 +8,7 @@
 @using DataLibrary.Services
 @using Microsoft.AspNetCore.Http
 @using System.Globalization
+@using System.Text.Json
 @inject GetUploadUri getUploadUri
 @inject UploadPdf uploadPdf
 @inject IDataContext dataContext
@@ -19,7 +20,6 @@
             <InputFile OnChange="OnInputFileChange" multiple></InputFile>
             <button class="btn btn-primary" type="submit" @onclick="UploadToLocal">UploadToLocal</button>
             <button class="btn btn-secondary" type="submit" @onclick="UploadToAdobe">UploadToAdobe</button>
-            <button class="btn btn-warning" type="submit" @onclick="ExtractPdf">ExtractPdf</button>
         </div>
         @if(selectedFiles is not null)
         {
@@ -76,21 +76,22 @@
     }
     private async void UploadToAdobe()
     {
+        FileModel model = new();
         foreach(var file in files)
         {
             var response = await getUploadUri.Upload();
-            var fileContent = response.Content.ReadAsStringAsync();
-            file.UploadUri = ""; // how to get from fileContent?
-            file.AssetId = ""; // how to get from fileContent?
+            var responseString = await response.Content.ReadAsStringAsync();
+            var responseObject = JsonSerializer.Deserialize<FileModel>(responseString);
+            file.UploadUri = responseObject.UploadUri;
+            file.AssetId = responseObject.AssetId;
             await uploadPdf.Upload(file.UploadUri, file.UploadPath);
         }
     }
 
-    private async void ExtractPdf()
-    {
-        // to do
-        // await extractPdf.Extract(file.AssetId);
-    }
+    //private async void ExtractPdf()
+    //{
+    //    await extractPdf.Extract(file.AssetId);
+    //}
 
     //private void UnzipFile()
     //{
