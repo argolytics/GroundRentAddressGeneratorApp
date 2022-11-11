@@ -10,12 +10,12 @@ public class GetUploadUri
     {
         this._factory = _factory;
     }
-    public async Task<HttpResponseMessage> Upload() // This method gets Adobe's uploadUri and assetId
+    public async Task<HttpResponseMessage> Upload()
     {
         var _httpClient = _factory.CreateClient(ClientName);
         MediaTypeModel mediaType = new()
         {
-            mediaType = "application/json"
+            mediaType = "application/pdf"
         };
         return await _httpClient.PostAsJsonAsync("https://pdf-services.adobe.io/assets", mediaType);
     }

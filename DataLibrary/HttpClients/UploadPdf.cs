@@ -1,4 +1,6 @@
-﻿namespace DataLibrary.HttpClients;
+﻿using DataLibrary.Models;
+
+namespace DataLibrary.HttpClients;
 public class UploadPdf
 {
     private readonly IHttpClientFactory _factory;
@@ -7,13 +9,13 @@ public class UploadPdf
     {
         this._factory = _factory;
     }
-    public async Task<HttpResponseMessage> Upload(string uploadUri, string uploadPath)
+    public async Task<HttpResponseMessage> Upload(FileModel file)
     {
         var _httpClient = _factory.CreateClient(ClientName);
-        FileStream fileStream = File.Create(uploadPath);
-        var size = fileStream.Length;
-        HttpContent content = new StreamContent(fileStream);
+        byte[] fileData = File.ReadAllBytes(file.UploadPath);
+        var stream = new MemoryStream(fileData);
+        HttpContent content = new StreamContent(stream);
 
-        return await _httpClient.PutAsync(uploadUri, content);
+        return await _httpClient.PutAsync(file.UploadUri, content);
     }
 }
