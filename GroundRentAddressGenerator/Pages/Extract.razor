@@ -22,7 +22,7 @@
         <div>
             <InputFile OnChange="OnInputFileChange" multiple></InputFile>
             <button class="btn btn-primary" type="submit" @onclick="UploadToLocal">UploadToLocal</button>
-            <button class="btn btn-secondary" type="submit" @onclick="ExtractAndDownload">ExtractAndDownload</button>
+            <button class="btn btn-secondary" type="submit" @onclick="Process">Process</button>
         </div>
         @if(selectedFiles is not null)
         {
@@ -77,22 +77,22 @@
         Message = $"{files.Count} file(s) uploaded on server";
         this.StateHasChanged();
     }
-    private async void ExtractAndDownload()
+    private async void Process()
     {
         foreach (var file in files)
         {
-            var response = await getUploadUri.Upload();
-            var responseString = await response.Content.ReadAsStringAsync();
-            var responseObject = JsonSerializer.Deserialize<FileModel>(responseString);
-            file.UploadUri = responseObject.UploadUri;
-            file.AssetId = responseObject.AssetId;
+            var uploadUriResponse = await getUploadUri.Upload();
+            var uploadUriResponseString = await uploadUriResponse.Content.ReadAsStringAsync();
+            var uploadUriResponseObject = JsonSerializer.Deserialize<FileModel>(uploadUriResponseString);
+            file.UploadUri = uploadUriResponseObject.UploadUri;
+            file.AssetId = uploadUriResponseObject.AssetId;
             await uploadPdf.Upload(file).ConfigureAwait(false);
             await extractPdf.Extract(file).ConfigureAwait(false);
-            Thread.Sleep(5000);
-            var response2 = await getDownloadStatus.GetStatus(file).ConfigureAwait(false);
-            var responseString2 = await response2.Content.ReadAsStringAsync();
-            var responseObject2 = JsonSerializer.Deserialize<FileModel>(responseString2);
-            file.DownloadUri = responseObject.DownloadUri;
+            Thread.Sleep(5000); // A sloppy way to give Adobe time to process the request
+            var getDownloadStatusResponse = await getDownloadStatus.GetStatus(file).ConfigureAwait(false);
+            var getDownloadStatusResponseString = await getDownloadStatusResponse.Content.ReadAsStringAsync();
+            var getDownloadStatusResponseObject = JsonSerializer.Deserialize<FileModel>(getDownloadStatusResponseString);
+            file.DownloadUri = getDownloadStatusResponseObject.DownloadUri;
             await downloadPdf.Download(file).ConfigureAwait(false);
         }
     }
