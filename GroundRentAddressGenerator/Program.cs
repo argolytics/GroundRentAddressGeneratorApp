@@ -1,7 +1,11 @@
 using DataLibrary;
 using DataLibrary.DbAccess;
 using DataLibrary.DbServices;
+using DataLibrary.Helpers;
+using DataLibrary.HttpClients;
+using DataLibrary.Settings;
 using MediatR;
+using System.Net.Http.Headers;
 
 namespace GroundRentAddressGenerator;
 
@@ -14,9 +18,52 @@ public class Program
 
         builder.Services.AddRazorPages();
         builder.Services.AddServerSideBlazor();
-        //builder.Services.AddMediatR(typeof(MediatREntryPoint).Assembly);
         builder.Services.AddScoped<IDataContext>(s => new DataContext(configuration.GetConnectionString("Default")));
         builder.Services.AddScoped<IAddressDataServiceFactory, AddressDataServiceFactory>();
+        builder.Services.AddScoped<AccessTokenInformation>();
+        var pdfSettings = new PDFServicesSettings();
+        configuration.GetSection("PDFServices").Bind(pdfSettings);
+        builder.Services.Configure<PDFServicesSettings>(opt =>
+        {
+            opt.JWT = pdfSettings.JWT;
+            opt.ClientId = pdfSettings.ClientId;
+            opt.ClientSecret = pdfSettings.ClientSecret;
+        });
+
+        // Http clients
+        builder.Services.AddScoped<GetUploadUri>();
+        builder.Services.AddScoped<UploadPdf>();
+        builder.Services.AddScoped<ExtractPdf>();
+        builder.Services.AddScoped<GetDownloadStatus>();
+        builder.Services.AddScoped<DownloadPdf>();
+        builder.Services.AddScoped<GetAccessToken>();
+        builder.Services.AddHttpClient("jwt", client =>
+        {
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        });
+        builder.Services.AddHttpClient("getUploadUri", client =>
+        {
+            client.DefaultRequestHeaders.Add("x-api-key", pdfSettings.ClientId);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        });
+        builder.Services.AddHttpClient("uploadPdf", client =>
+        {
+            client.DefaultRequestHeaders.Add("x-api-key", pdfSettings.ClientId);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/pdf"));
+        });
+        builder.Services.AddHttpClient("extractPdf", client =>
+        {
+            client.DefaultRequestHeaders.Add("x-api-key", pdfSettings.ClientId);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        });
+        builder.Services.AddHttpClient("getDownloadStatus", client =>
+        {
+            client.DefaultRequestHeaders.Add("x-api-key", pdfSettings.ClientId);
+        });
+        builder.Services.AddHttpClient("downloadPdf", client =>
+        {
+            client.DefaultRequestHeaders.Add("x-api-key", pdfSettings.ClientId);
+        });
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.
