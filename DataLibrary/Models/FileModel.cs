@@ -16,4 +16,5 @@ public class FileModel
 
     [JsonPropertyName("downloadUri")]
     public string? DownloadUri { get; set; }
+    public Uri? DownloadCheckLocation { get; set; }
 }
