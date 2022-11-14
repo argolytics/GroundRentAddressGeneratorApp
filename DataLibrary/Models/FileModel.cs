@@ -10,6 +10,8 @@ public class FileModel
     public string? AssetId { get; set; }
     public string? FileId { get; } = Guid.NewGuid().ToString();
     public string? UploadPath { get; set; }
+    public string? ZipPath { get; set; }
+    public string? CsvPath { get; set; }
 
     [JsonPropertyName("uploadUri")]
     public string? UploadUri { get; set; }

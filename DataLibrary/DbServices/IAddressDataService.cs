@@ -4,6 +4,9 @@ namespace DataLibrary.DbServices
 {
     public interface IAddressDataService
     {
-        Task CreateAddress(AddressModel addressModel);
+        Task CreateOrUpdateAddress(AddressModel addressModel);
+        Task<AddressModel> ReadAddressById(int id);
+        Task UpdateAddress(AddressModel addressModel);
+        Task DeleteAddress(int id);
     }
 }

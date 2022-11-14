@@ -9,6 +9,7 @@
 @using Microsoft.AspNetCore.Http
 @using System.Globalization
 @using System.Text.Json
+@using System.IO.Compression;
 @inject GetUploadUri getUploadUri
 @inject UploadPdf uploadPdf
 @inject ExtractPdf extractPdf
@@ -43,7 +44,7 @@
     private IReadOnlyList<IBrowserFile>? selectedFiles;
     private List<FileModel> files = new();
     private string Message = "No file(s) selected";
-    private long maxAllowedBufferSize = 1024 * 1024 * 4;
+    private long maxAllowedBufferSize = 1024 * 1024 * 200;
 
     private async Task OnInputFileChange(InputFileChangeEventArgs e)
     {
@@ -91,11 +92,10 @@
             var resExt = await extractPdf.Extract(file).ConfigureAwait(false);
             file.DownloadCheckLocation = resExt.Headers.Location;
             var resExtString = await resExt.Content.ReadAsStringAsync();
-            //Thread.Sleep(5000); // A sloppy way to give Adobe time to process the requestgc
             JobStatusModel jsm;
             do
             {
-                await Task.Delay(500);
+                await Task.Delay(2000);
                 var getDownloadStatusResponse = await getDownloadStatus.GetStatus(file).ConfigureAwait(false);
                 var getDownloadStatusResponseString = await getDownloadStatusResponse.Content.ReadAsStringAsync();
                 jsm = JsonSerializer.Deserialize<JobStatusModel>(getDownloadStatusResponseString);
@@ -104,47 +104,37 @@
             file.DownloadUri = jsm.Resource.DownloadUri;
             var fileResponse = await downloadPdf.Download(file).ConfigureAwait(false);
             var data = await fileResponse.Content.ReadAsByteArrayAsync();
-            var path = file.UploadPath.Replace(".pdf", ".zip");
+            file.ZipPath = file.UploadPath.Replace(".pdf", ".zip");
 
             using var memStream = new MemoryStream(data);
-            using var filestream = new FileStream(path, FileMode.Create);
+            using var filestream = new FileStream(file.ZipPath, FileMode.Create);
             await memStream.CopyToAsync(filestream);
-            await filestream.FlushAsync();
+            filestream.Close();
+
+            ZipFile.ExtractToDirectory(file.ZipPath, Directory.GetCurrentDirectory() + @"\wwwroot\data\zipData\");
+            File.Delete(file.UploadPath);
+            File.Delete(file.ZipPath);
+            File.Delete(@"C:\Users\Jason\source\repos\GroundRentProcesssorApp\GroundRentProcesssor\wwwroot\data\zipData\structuredData.json");
+
+            file.CsvPath = Directory.GetCurrentDirectory() + @"\wwwroot\data\zipData\tables\" + "fileoutpart0.csv";
+            using (var streamReader = new StreamReader(file.CsvPath))
+            {
+                using (var csvReader = new CsvReader(streamReader, CultureInfo.InvariantCulture))
+                {
+                    csvReader.Context.RegisterClassMap<AddressClassMap>();
+                    while (csvReader.Read())
+                    {
+                        using (var uow = dataContext.CreateUnitOfWork())
+                        {
+                            var record = csvReader.GetRecord<AddressModel>();
+                            var addressDataService = addressDataServiceFactory.CreateAddressDataService(uow);
+                            await addressDataService.CreateOrUpdateAddress(record);
+                        }
+                    }
+                }
+            }
+            var tableDirectory = new DirectoryInfo(Directory.GetCurrentDirectory() + @"\wwwroot\data\zipData\tables\");
+            tableDirectory.Delete(true);
         }
     }
-
-    //private void UnzipFile()
-    //{
-    //    string jsonPath =
-    //            @"C:\Users\Jason\source\repos\GroundRentAddressGeneratorApp\GroundRentAddressGenerator\wwwroot\Data\";
-
-    //    ZipFile.ExtractToDirectory(request.ExtractFromFilePath, request.ExtractToFilePath);
-    //    if (request.ExtractFromFilePath != null)
-    //    {
-    //        File.Delete(request.ExtractFromFilePath);
-    //    }
-    //    if (request.JsonFilePath != null)
-    //    {
-    //        File.Delete(request.JsonFilePath);
-    //    }
-    //}
-    //private async void ParseCsv()
-    //{
-    //    using (var streamReader = new StreamReader(request.FilePath))
-    //    {
-    //        using (var csvReader = new CsvReader(streamReader, CultureInfo.InvariantCulture))
-    //        {
-    //            csvReader.Context.RegisterClassMap<AddressClassMap>();
-    //            while (csvReader.Read())
-    //            {
-    //                using (var uow = dataContext.CreateUnitOfWork())
-    //                {
-    //                    var record = csvReader.GetRecord<AddressModel>();
-    //                    var addressDataService = addressDataServiceFactory.CreateAddressDataService(uow);
-    //                    await addressDataService.CreateAddress(record);
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
 }
