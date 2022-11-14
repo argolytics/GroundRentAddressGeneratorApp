@@ -4,12 +4,7 @@ using Microsoft.Extensions.Options;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.OpenSsl;
 using Org.BouncyCastle.Security;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataLibrary.HttpClients;
 public class AccessTokenDelegatingHandler : DelegatingHandler
